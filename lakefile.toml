@@ -1,0 +1,11 @@
+name = "wheel-cli"
+version = "0.1.0"
+defaultTargets = ["WheelCli"]
+
+[[lean_lib]]
+name = "WheelCli"
+
+[[require]]
+name = "batteries"
+scope = "leanprover-community"
+rev = "main"
