@@ -1,39 +1,43 @@
-import Batteries
+import Lean.Elab
+import Lean.Elab.Command
+open Lean Elab Command Parser
 
--- TODO: finite universe of argtypes (inextensible :()
+class ArgVal (α) where
+  fromArg : String → Option α
 
-class Arg (α : Type) where
-  fromStr : String → Option α
+instance [Coe String α] : ArgVal α where
+  fromArg := some ∘ Coe.coe
 
-instance [Coe String α] : Arg α where
-  fromStr := some ∘ Coe.coe
+instance : ArgVal Nat where
+  fromArg := String.toNat?
 
-instance : Arg Nat where
-  fromStr := String.toNat?
+instance : ArgVal Int where
+  fromArg := String.toInt?
 
-instance : Arg Int where
-  fromStr := String.toInt?
+-- TODO: better errors
+class Args (α) where
+  fromArgs : List String → Option α
 
-def Tag (name : String) := {s // s = name}
+def deriveArgs (declNames : Array Name) : CommandElabM Bool := do
+  if h : declNames.size = 1 then
+    let env ← getEnv
+    if let some (.inductInfo info) := env.find? declNames[0] then
+    if h : info.ctors.length = 1 then
+    if let some (.ctorInfo info) := env.find? info.ctors[0] then
+      while let some (inp, out) := IO.println info.type.arrow? do
+      let mut varDecls := #[]
+      let cmd ← `(instance : Args $(mkIdent declNames[0]) where
+        fromArgs args := do
+          $varDecls*
+          for arg in args do
+            sorry
+      )
+      elabCommand cmd
+      return true
+  return false
 
-inductive Tagged (name : String) (τ : Type)
-| intro (x : τ)
+initialize
+  registerDerivingHandler ``Args deriveArgs
 
-inductive  Cli where
-| nil : Cli
-| cons (flag : String) (τ : Type) [Arg τ] : Cli → Cli
-
-@[reducible] def Cli.denote
-| nil => Unit
-| cons flag τ rest => (Tagged flag τ) × rest.denote
-
-inductive HasFlag : Cli → String → Type → Type
-| here  [Arg τ] : HasFlag (.cons name τ rest) name τ
-| there [Arg τ] : HasFlag rest name τ → HasFlag (.cons _ rest) name τ
-
-def parse : List String → (cli : Cli) → IO cli.denote := sorry
-
-#reduce (types := true) Cli.denote .nil
-#reduce (types := true) Cli.denote (.cons "bar" Nat .nil)
-#reduce (types := true) Cli.denote (.cons "foo" Nat <| .cons "bar" Int .nil)
-#check parse [] (.cons "foo" Nat <| .cons "bar" Int .nil)
+#check `Foo
+#check `(Foo)
