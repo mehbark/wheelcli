@@ -1,6 +1,6 @@
 import Lean.Elab
 import Lean.Elab.Command
-open Lean Elab Command Parser
+open Lean Elab Command Parser Term
 
 class ArgVal (α) where
   fromArg : String → Option α
@@ -14,30 +14,52 @@ instance : ArgVal Nat where
 instance : ArgVal Int where
   fromArg := String.toInt?
 
+instance : ArgVal String where
+  fromArg := some
+
 -- TODO: better errors
 class Args (α) where
-  fromArgs : List String → Option α
+  fromArgs : Array String → Option α
+
+def run [Args α] (main : (α → IO UInt32)) (args : List String) : IO UInt32 := do
+  if let some args := Args.fromArgs args.toArray then
+    main args
+  else
+    IO.eprintln "bad args brah"
+    return 127
 
 def deriveArgs (declNames : Array Name) : CommandElabM Bool := do
   if h : declNames.size = 1 then
     let env ← getEnv
-    if let some (.inductInfo info) := env.find? declNames[0] then
+    let name := declNames[0]
+    if isStructure env name then
+    if let some (.inductInfo info) := env.find? name then
     if h : info.ctors.length = 1 then
-    if let some (.ctorInfo info) := env.find? info.ctors[0] then
-      while let some (inp, out) := IO.println info.type.arrow? do
-      let mut varDecls := #[]
-      let cmd ← `(instance : Args $(mkIdent declNames[0]) where
-        fromArgs args := do
-          $varDecls*
-          for arg in args do
-            sorry
-      )
-      elabCommand cmd
-      return true
+    let ctor := info.ctors[0]
+    let fieldNames := getStructureFieldsFlattened env name (includeSubobjectFields := false)
+    let flags := fieldNames.map (quote s!"--{·}")
+    let fields  := fieldNames.map Lean.mkIdent
+    let fields' := fields
+    let cmd ← `(instance : Args $(mkIdent name) where
+      fromArgs args := do
+        $[let mut $fields:ident := none]*
+        let mut i := 0
+        while h : i + 1 < args.size do
+          match args[i], args[i+1] with
+          $[| $flags, val => do $fields:ident := ArgVal.fromArg val]*
+            | _, _ => pure ()
+
+          i := i + 2
+
+        (do
+          $[let $fields ← $fields':ident]*
+          -- TODO: remove `ctor`, use struct syntax
+          return $(Lean.mkIdent ctor):term $fields*
+        )
+    )
+    elabCommand cmd
+    return true
   return false
 
 initialize
   registerDerivingHandler ``Args deriveArgs
-
-#check `Foo
-#check `(Foo)
