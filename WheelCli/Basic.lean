@@ -49,7 +49,8 @@ def deriveArgs (declNames : Array Name) : CommandElabM Bool := do
     if h : info.ctors.length = 1 then
     let ctor := info.ctors[0]
     let fieldNames := getStructureFieldsFlattened env name (includeSubobjectFields := false)
-    let flags := fieldNames.map (quote s!"--{·}")
+    let flags := fieldNames.map fun name => quote <|
+      if name.toString.length = 1 then s!"-{name}" else s!"--{name}"
     let fields  := fieldNames.map Lean.mkIdent
     let fields' := fields
     let cmd ← `(instance : FromArgs $(mkIdent name) where
