@@ -1,7 +1,12 @@
 import Lean.Elab
 import Lean.Elab.Command
 open Lean Elab Command Parser Term
+namespace WheelCli
 
+/--
+  `ArgVal α` is a typeclass that says `α` can (possibly fallibly)
+  be parsed from a `String`.
+-/
 class ArgVal (α) where
   fromArg : String → Option α
 
@@ -18,12 +23,20 @@ instance : ArgVal String where
   fromArg := some
 
 -- TODO: better errors
+/--
+  `Args α` is a typeclass that says `α` can be parsed from an `Array String`.
+  It can be derived for simple `structure`s.
+-/
 class Args (α) where
   fromArgs : Array String → Option α
 
-def run [Args α] (main : (α → IO UInt32)) (args : List String) : IO UInt32 := do
+/--
+  Parses arguments and runs `f` or exits with error code `127`.
+  Intended for use in the `main` function.
+-/
+def withArgs [Args α] (f : α → IO UInt32) (args : List String) : IO UInt32 := do
   if let some args := Args.fromArgs args.toArray then
-    main args
+    f args
   else
     IO.eprintln "bad args brah"
     return 127
@@ -54,6 +67,7 @@ def deriveArgs (declNames : Array Name) : CommandElabM Bool := do
         (do
           $[let $fields ← $fields':ident]*
           -- TODO: remove `ctor`, use struct syntax
+          -- TODO: default args
           return $(Lean.mkIdent ctor):term $fields*
         )
     )
