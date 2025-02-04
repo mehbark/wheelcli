@@ -1,41 +1,40 @@
 import Lean.Elab
 import Lean.Elab.Command
 open Lean Elab Command Parser Term
-namespace WheelCli
 
 /--
-  `ArgVal α` is a typeclass that says `α` can (possibly fallibly)
+  `FromArg α` is a typeclass that says `α` can (possibly fallibly)
   be parsed from a `String`.
 -/
-class ArgVal (α) where
+class FromArg (α) where
   fromArg : String → Option α
 
-instance [Coe String α] : ArgVal α where
+instance [Coe String α] : FromArg α where
   fromArg := some ∘ Coe.coe
 
-instance : ArgVal Nat where
+instance : FromArg Nat where
   fromArg := String.toNat?
 
-instance : ArgVal Int where
+instance : FromArg Int where
   fromArg := String.toInt?
 
-instance : ArgVal String where
+instance : FromArg String where
   fromArg := some
 
 -- TODO: better errors
 /--
-  `Args α` is a typeclass that says `α` can be parsed from an `Array String`.
+  `FromArgs α` is a typeclass that says `α` can be parsed from an `Array String`.
   It can be derived for simple `structure`s.
 -/
-class Args (α) where
+class FromArgs (α) where
   fromArgs : Array String → Option α
 
 /--
   Parses arguments and runs `f` or exits with error code `127`.
   Intended for use in the `main` function.
 -/
-def withArgs [Args α] (f : α → IO UInt32) (args : List String) : IO UInt32 := do
-  if let some args := Args.fromArgs args.toArray then
+def withArgs [FromArgs α] (f : α → IO UInt32) (args : List String) : IO UInt32 := do
+  if let some args := FromArgs.fromArgs args.toArray then
     f args
   else
     IO.eprintln "bad args brah"
@@ -53,13 +52,13 @@ def deriveArgs (declNames : Array Name) : CommandElabM Bool := do
     let flags := fieldNames.map (quote s!"--{·}")
     let fields  := fieldNames.map Lean.mkIdent
     let fields' := fields
-    let cmd ← `(instance : Args $(mkIdent name) where
+    let cmd ← `(instance : FromArgs $(mkIdent name) where
       fromArgs args := do
         $[let mut $fields:ident := none]*
         let mut i := 0
         while h : i + 1 < args.size do
           match args[i], args[i+1] with
-          $[| $flags, val => do $fields:ident := ArgVal.fromArg val]*
+          $[| $flags, val => do $fields:ident := FromArg.fromArg val]*
             | _, _ => pure ()
 
           i := i + 2
@@ -76,4 +75,4 @@ def deriveArgs (declNames : Array Name) : CommandElabM Bool := do
   return false
 
 initialize
-  registerDerivingHandler ``Args deriveArgs
+  registerDerivingHandler ``FromArgs deriveArgs
