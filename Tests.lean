@@ -5,14 +5,18 @@ structure Foo where
   baz : String
 deriving Args, Repr
 
-#print instArgsFoo
-
+/-- info: some { bar := 3, baz := "bla" } -/
+#guard_msgs in
 #eval (Args.fromArgs #["--bar", "3", "--baz", "bla"] : Option Foo)
 
-#eval Id.run do
-  let mut i := 0
-  while i < 10 do
-    match 3 with
-    | 3 => do i := i + 1
-    | _ => pure ()
-  return i
+/-- info: some { bar := 3, baz := "bla" } -/
+#guard_msgs in
+#eval (Args.fromArgs #["--baz", "bla", "--bar", "3"] : Option Foo)
+
+/-- info: none -/
+#guard_msgs in
+#eval (Args.fromArgs #["--baz", "bla"] : Option Foo)
+
+/-- info: none -/
+#guard_msgs in
+#eval (Args.fromArgs #["--bar", "-1", "--baz", "bla"] : Option Foo)
